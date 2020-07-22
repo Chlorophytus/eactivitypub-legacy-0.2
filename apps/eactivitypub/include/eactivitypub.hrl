@@ -11,23 +11,17 @@
 %%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %%% See the License for the specific language governing permissions and
 %%% limitations under the License.
-{application, eactivitypub,
- [{description, "Erlang-powered ActivityPub / Mastodon"},
-  {vsn, "0.1.0"},
-  {registered, []},
-  {mod, {eactivitypub_app, []}},
-  {applications,
-   [kernel,
-    stdlib,
-    cowboy
-   ]},
-  {env,[
-      {ssl_in_place, true},
-      {ssl_crt, "example_crt.pem"},
-      {ssl_key, "example_key.pem"}
-      ]},
-  {modules, []},
+%%%-------------------------------------------------------------------
+%% @doc eactivitypub constants and records
+%% @end
+%%%-------------------------------------------------------------------
 
-  {licenses, ["Apache 2.0"]},
-  {links, []}
- ]}.
+%% When does the rate limit reset, in seconds?
+-define(RATELIMIT_RESET, 1).
+-define(RATELIMIT_RESET_HARD, 60).
+
+%% How many ops until a rate limit is hit?
+-define(RATELIMIT_LIMIT, 2).
+
+%% When do we delete the rate limit bucket, in milliseconds?
+-define(RATELIMIT_EXPIRE, 60000 * 60 * 24 * 7).
