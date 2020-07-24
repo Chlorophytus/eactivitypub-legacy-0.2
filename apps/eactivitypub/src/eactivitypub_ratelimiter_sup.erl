@@ -12,36 +12,37 @@
 %%% See the License for the specific language governing permissions and
 %%% limitations under the License.
 %%%-------------------------------------------------------------------
-%% @doc eactivitypub modular rate limiter
+%% @doc eactivitypub modular rate limiter supervisor
 %% > A server can have many rate limiters.
 %% @end
 %%%-------------------------------------------------------------------
 
--module(eactivitypub_ratelimiter).
+-module(eactivitypub_ratelimiter_sup).
 
--behaviour(gen_server).
+-behaviour(supervisor).
 
 -export([start_link/0]).
 
 -export([init/1]).
 
--export([handle_call/3, handle_cast/2]).
-
--include("eactivitypub.hrl").
-
 -define(SERVER, ?MODULE).
 
 start_link() ->
-    gen_server:start_link({local, ?SERVER},
-                          ?MODULE,
-                          [],
-                          []).
+    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
+%% sup_flags() = #{strategy => strategy(),         % optional
+%%                 intensity => non_neg_integer(), % optional
+%%                 period => pos_integer()}        % optional
+%% child_spec() = #{id => child_id(),       % mandatory
+%%                  start => mfargs(),      % mandatory
+%%                  restart => restart(),   % optional
+%%                  shutdown => shutdown(), % optional
+%%                  type => worker(),       % optional
+%%                  modules => modules()}   % optional
 init([]) ->
-    {ok, #{}}.
+    SupFlags = #{strategy => simple_one_for_one, intensity => 0,
+                 period => 1},
+    ChildSpecs = [],
+    {ok, {SupFlags, ChildSpecs}}.
 
-handle_call(_Event, _From, _State) ->
-    unimplemented.
-
-handle_cast(_Event, _State) ->
-    unimplemented.    
+%% internal functions
