@@ -3,13 +3,14 @@ defmodule Eactivitypub do
   Documentation for Eactivitypub.
   """
 
+  @spec hello :: :world
   @doc """
   Hello world.
 
   ## Examples
 
       iex> Eactivitypub.hello()
-      :world
+      :ok
 
   """
   def hello do

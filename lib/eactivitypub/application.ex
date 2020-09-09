@@ -1,3 +1,5 @@
+require Logger
+
 defmodule Eactivitypub.Application do
   # See https://hexdocs.pm/elixir/Application.html
   # for more information on OTP Applications
@@ -14,6 +16,8 @@ defmodule Eactivitypub.Application do
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Eactivitypub.Supervisor]
+    Logger.info('=== start eactivitypub application ===')
+    Application.ensure_all_started(:crypto)
     Supervisor.start_link(children, opts)
   end
 end
