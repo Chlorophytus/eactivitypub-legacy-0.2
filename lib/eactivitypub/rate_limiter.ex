@@ -2,7 +2,7 @@ require Logger
 
 defmodule Eactivitypub.RateLimiter do
   @moduledoc """
-  A server can have many rate limiters.
+  An eactivitypub instance can have many rate limiters.
   """
   use GenServer
 
@@ -10,11 +10,11 @@ defmodule Eactivitypub.RateLimiter do
     @moduledoc """
     Contains a struct and constants for rate limiter state.
     """
-    @constants %{initial_left: 2, grace_seconds: 60}
+    @constants %{initial_left: 2, grace_seconds: 60, grace_multiplier: 2, grace_max: 6}
     @enforce_keys [:ref]
-    defstruct ref: nil, hits: @constants[:initial_left]
+    defstruct ref: nil, hits: @constants[:initial_left], multiplier: 0
 
-    @type t :: %__MODULE__{ref: String.t(), hits: non_neg_integer}
+    @type t :: %__MODULE__{ref: String.t(), hits: non_neg_integer, multiplier: non_neg_integer}
   end
 
   @impl true
@@ -29,7 +29,21 @@ defmodule Eactivitypub.RateLimiter do
   This is used for identifying rate limiters.
   """
   def reference64() do
-    ref_integer = :erlang.unique_integer()
-    Base.encode64(:crypto.hash(:sha3_224, to_charlist(ref_integer)))
+    Base.encode64(:crypto.hash(:sha3_224, to_charlist(:erlang.unique_integer())))
+  end
+
+  @impl true
+  def handle_call({:try_decrement, destination}, from, state) do
+    cond do
+      state[:ref] === destination ->
+        case state[:hits] do
+          # TODO: add in the actual logic with DateTime
+          0 -> {:reply, :rate_limited}
+          _ -> :unimplemented
+        end
+
+      true ->
+        :unimplemented
+    end
   end
 end
