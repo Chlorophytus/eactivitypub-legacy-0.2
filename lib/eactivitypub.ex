@@ -10,7 +10,7 @@ defmodule Eactivitypub do
   ## Examples
 
       iex> Eactivitypub.hello()
-      :ok
+      :world
 
   """
   def hello do
