@@ -2,13 +2,18 @@ require Logger
 
 defmodule Eactivitypub.RateLimiter do
   @moduledoc """
-  An eactivitypub instance can have many rate limiters.
+  Rate limiter server, intended to be used on a one-per-client basis.
   """
   use GenServer
   @const_initial_left 2
   @const_reset_seconds 2
   @const_grace_seconds 60
   @const_grace_max 64
+
+  @spec grace_multiplier(integer) :: integer
+  @doc """
+  Calculates a new grace multiplier given the previous one in the state.
+  """
   def grace_multiplier(previous) when previous >= @const_grace_max do
     @const_grace_max
   end
@@ -17,7 +22,7 @@ defmodule Eactivitypub.RateLimiter do
 
   defmodule State do
     @moduledoc """
-    Contains a struct and constants for rate limiter state.
+    Contains a struct for a rate limiter's internal server state.
     """
     @enforce_keys [:ref, :hits]
     defstruct ref: nil, hits: nil, grace: nil, multiplier: 1
@@ -31,7 +36,10 @@ defmodule Eactivitypub.RateLimiter do
   end
 
   defmodule Reply do
-    @enforce_keys [:throttled, :hits_left]
+    @moduledoc """
+    The rate limiter server responds with this struct when it gets triggered.
+    """
+    @enforce_keys [:throttled, :hits_left, :wait]
     defstruct throttled: nil, hits_left: nil, wait: nil
 
     @type t :: %__MODULE__{
@@ -47,6 +55,10 @@ defmodule Eactivitypub.RateLimiter do
     {:ok, %State{ref: reference64(), hits: @const_initial_left}}
   end
 
+  @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
+  @doc """
+  Recommended way of starting a rate limiter.
+  """
   def start_link(args) do
     GenServer.start_link(__MODULE__, args)
   end
@@ -54,13 +66,24 @@ defmodule Eactivitypub.RateLimiter do
   @spec reference64() :: binary
   @doc """
   Generates a Base64 variant of a SHA3-224 hashed Erlang unique integer.
-  This is used for identifying rate limiters.
+  These are used for identifying rate limiters.
   """
   def reference64() do
     Base.encode64(:crypto.hash(:sha3_224, to_charlist(:erlang.unique_integer())))
   end
 
   @impl true
+  @doc """
+  Synchronous interaction with the internal rate limit server.
+
+  ## `:get_reference`
+  Gets the reference of this rate limit server.
+
+  ## `{:try_decrement, destination}`
+  Usually called with a scattering `GenServer.multi_call/4`.
+  A valid rate limit server should process this call if the `destination`
+  itself points to a valid rate limiter.
+  """
   def handle_call(:get_reference, _from, state) do
     {:reply, {:ok, state.ref}, state}
   end
