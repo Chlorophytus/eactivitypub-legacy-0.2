@@ -97,8 +97,7 @@ defmodule Eactivitypub.RateLimiter do
         case state.hits do
           0 ->
             # Calculate an offset from Unix time
-            next_grace_interval = grace_multiplier(state.multiplier)
-            unix_time = DateTime.to_unix(state.grace) + next_grace_interval
+            unix_time = DateTime.to_unix(state.grace) + state.multiplier
 
             cond do
               # We aren't being rate limited anymore.
@@ -112,6 +111,8 @@ defmodule Eactivitypub.RateLimiter do
 
               # We are still being rate limited.
               true ->
+                next_grace_interval = grace_multiplier(state.multiplier)
+
                 {:ok, next_grace} =
                   DateTime.from_unix(next_grace_interval * @const_grace_seconds + unix_curr)
 
