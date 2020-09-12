@@ -22,15 +22,16 @@ defmodule Eactivitypub.RateLimiter do
 
   defmodule State do
     @moduledoc """
-    Contains a struct for a rate limiter's internal server state.
+    The rate limiter's internal server state struct.
     """
     @enforce_keys [:ref, :hits]
-    defstruct ref: nil, hits: nil, grace: nil, multiplier: 1
+    defstruct ref: nil, hits: nil, grace: nil, started: nil, multiplier: 1
 
     @type t :: %__MODULE__{
-            ref: String.t(),
+            ref: binary,
             hits: non_neg_integer,
             grace: DateTime.t(),
+            started: DateTime.t(),
             multiplier: non_neg_integer
           }
   end
@@ -49,12 +50,7 @@ defmodule Eactivitypub.RateLimiter do
           }
   end
 
-  @impl true
-  @spec init(any) :: {:ok, %State{}}
-  def init(_) do
-    {:ok, %State{ref: reference64(), hits: @const_initial_left}}
-  end
-
+  # === Conveniences ==========================================================
   @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
   @doc """
   Recommended way of starting a rate limiter.
@@ -63,27 +59,34 @@ defmodule Eactivitypub.RateLimiter do
     GenServer.start_link(__MODULE__, args)
   end
 
-  @spec reference64() :: binary
+  @spec get_reference(atom | pid | {atom, any} | {:via, atom, any}) :: any
   @doc """
-  Generates a Base64 variant of a SHA3-224 hashed Erlang unique integer.
-  These are used for identifying rate limiters.
+  Gets the reference of this rate limit server.
   """
-  def reference64() do
-    Base.encode64(:crypto.hash(:sha3_224, to_charlist(:erlang.unique_integer())))
+  def get_reference(pid) do
+    GenServer.call(pid, :get_reference)
   end
 
-  @impl true
+  @spec try_decrement(atom | pid | {atom, any} | {:via, atom, any}, binary) :: any
   @doc """
-  Synchronous interaction with the internal rate limit server.
+  Handles a single rate limit hit.
 
-  ## `:get_reference`
-  Gets the reference of this rate limit server.
-
-  ## `{:try_decrement, destination}`
-  Usually called with a scattering `GenServer.multi_call/4`.
   A valid rate limit server should process this call if the `destination`
   itself points to a valid rate limiter.
   """
+  def try_decrement(pid, destination) do
+    GenServer.call(pid, {:try_decrement, destination})
+  end
+
+  # === Internal Server Calls =================================================
+  @impl true
+  @spec init(any) :: {:ok, %State{}}
+  def init(_) do
+    ref64 = Base.encode64(:crypto.hash(:sha3_224, to_charlist(:erlang.unique_integer())))
+    {:ok, %State{ref: ref64, hits: @const_initial_left, started: DateTime.utc_now()}}
+  end
+
+  @impl true
   def handle_call(:get_reference, _from, state) do
     {:reply, {:ok, state.ref}, state}
   end

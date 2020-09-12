@@ -15,7 +15,7 @@ defmodule Eactivitypub.MixProject do
   def application do
     [
       extra_applications: [:logger, :plug_cowboy],
-      mod: {Eactivitypub.Application, []}
+      mod: {Eactivitypub, []}
     ]
   end
 
