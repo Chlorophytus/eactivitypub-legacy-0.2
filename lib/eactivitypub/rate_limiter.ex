@@ -1,3 +1,17 @@
+# > Garbage-collected rate limiting service
+# Copyright 2020 Roland Metivier
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 require Logger
 
 defmodule Eactivitypub.RateLimiter do
@@ -8,7 +22,10 @@ defmodule Eactivitypub.RateLimiter do
   @const_initial_left 2
   @const_reset_seconds 2
   @const_grace_seconds 60
-  @const_grace_max 64
+  @const_grace_max 256
+
+  # 72 hours is enough for a rate limiter to keep alive
+  @const_grace_gc 60 * 60 * 60 * 72
 
   @spec grace_multiplier(integer) :: integer
   @doc """
@@ -24,14 +41,15 @@ defmodule Eactivitypub.RateLimiter do
     @moduledoc """
     The rate limiter's internal server state struct.
     """
-    @enforce_keys [:ref, :hits]
-    defstruct ref: nil, hits: nil, grace: nil, started: nil, multiplier: 1
+    @enforce_keys [:ref, :hits, :last]
+    defstruct ref: nil, hits: nil, grace: nil, started: nil, last: nil, multiplier: 1
 
     @type t :: %__MODULE__{
             ref: binary,
             hits: non_neg_integer,
             grace: DateTime.t(),
             started: DateTime.t(),
+            last: DateTime.t(),
             multiplier: non_neg_integer
           }
   end
@@ -78,12 +96,44 @@ defmodule Eactivitypub.RateLimiter do
     GenServer.call(pid, {:try_decrement, destination})
   end
 
+  @spec gc_sweep :: :abcast
+  @doc """
+  Performs a garbage collection sweep of every rate limiter.
+
+  A rate limiter should only be garbage collected if older than a few days.
+  """
+  def gc_sweep do
+    GenServer.abcast(__MODULE__, :gc_sweep)
+  end
+
   # === Internal Server Calls =================================================
   @impl true
   @spec init(any) :: {:ok, %State{}}
   def init(_) do
     ref64 = Base.encode64(:crypto.hash(:sha3_224, to_charlist(:erlang.unique_integer())))
-    {:ok, %State{ref: ref64, hits: @const_initial_left, started: DateTime.utc_now()}}
+
+    {:ok,
+     %State{
+       ref: ref64,
+       hits: @const_initial_left,
+       started: DateTime.utc_now(),
+       last: DateTime.utc_now()
+     }}
+  end
+
+  @impl true
+  def handle_cast(:gc_sweep, state) do
+    gc_time = DateTime.add(state.last, @const_grace_gc)
+
+    case DateTime.compare(DateTime.utc_now(), gc_time) do
+      :gt ->
+        # This state should be garbage collected now
+        {:stop, :normal, state}
+
+      _ ->
+        # Keep going
+        {:noreply, state}
+    end
   end
 
   @impl true
@@ -109,7 +159,13 @@ defmodule Eactivitypub.RateLimiter do
 
                 {:reply,
                  {:ok, %Reply{throttled: false, hits_left: @const_initial_left, wait: next_time}},
-                 %State{state | grace: next_time, multiplier: 1, hits: @const_initial_left}}
+                 %State{
+                   state
+                   | grace: next_time,
+                     multiplier: 1,
+                     hits: @const_initial_left,
+                     last: current_time
+                 }}
 
               _ ->
                 # We are still being rate limited.
@@ -117,7 +173,7 @@ defmodule Eactivitypub.RateLimiter do
                 next_time = DateTime.add(current_time, next_interval * @const_grace_seconds)
 
                 {:reply, {:ok, %Reply{throttled: true, hits_left: 0, wait: next_time}},
-                 %State{state | grace: next_time, multiplier: next_interval}}
+                 %State{state | grace: next_time, multiplier: next_interval, last: current_time}}
             end
 
           _ ->
@@ -125,7 +181,7 @@ defmodule Eactivitypub.RateLimiter do
             next_hits = state.hits - 1
 
             {:reply, {:ok, %Reply{throttled: false, hits_left: next_hits, wait: next_time}},
-             %State{state | grace: next_time, multiplier: 1, hits: next_hits}}
+             %State{state | grace: next_time, multiplier: 1, hits: next_hits, last: current_time}}
         end
 
       true ->
