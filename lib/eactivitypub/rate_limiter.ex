@@ -95,40 +95,37 @@ defmodule Eactivitypub.RateLimiter do
   def handle_call({:try_decrement, destination}, _from, state) do
     cond do
       state.ref == destination ->
-        unix_curr = DateTime.to_unix(DateTime.utc_now())
+        current_time = DateTime.utc_now()
 
         case state.hits do
           0 ->
-            # Calculate an offset from Unix time
-            unix_time = DateTime.to_unix(state.grace) + state.multiplier
+            # Calculate an offset
+            multiplier_offset = DateTime.add(state.grace, state.multiplier)
 
-            cond do
-              # We aren't being rate limited anymore.
-              unix_time < unix_curr ->
-                {:ok, next_grace} = DateTime.from_unix(unix_curr + @const_reset_seconds)
+            case DateTime.compare(current_time, multiplier_offset) do
+              :gt ->
+                # We aren't being rate limited anymore.
+                next_time = DateTime.add(current_time, @const_reset_seconds)
 
                 {:reply,
-                 {:ok,
-                  %Reply{throttled: false, hits_left: @const_initial_left, wait: next_grace}},
-                 %State{state | grace: next_grace, multiplier: 1, hits: @const_initial_left}}
+                 {:ok, %Reply{throttled: false, hits_left: @const_initial_left, wait: next_time}},
+                 %State{state | grace: next_time, multiplier: 1, hits: @const_initial_left}}
 
-              # We are still being rate limited.
-              true ->
-                next_grace_interval = grace_multiplier(state.multiplier)
+              _ ->
+                # We are still being rate limited.
+                next_interval = grace_multiplier(state.multiplier)
+                next_time = DateTime.add(current_time, next_interval * @const_grace_seconds)
 
-                {:ok, next_grace} =
-                  DateTime.from_unix(next_grace_interval * @const_grace_seconds + unix_curr)
-
-                {:reply, {:ok, %Reply{throttled: true, hits_left: 0, wait: next_grace}},
-                 %State{state | grace: next_grace, multiplier: next_grace_interval}}
+                {:reply, {:ok, %Reply{throttled: true, hits_left: 0, wait: next_time}},
+                 %State{state | grace: next_time, multiplier: next_interval}}
             end
 
           _ ->
-            {:ok, next_grace} = DateTime.from_unix(unix_curr + @const_reset_seconds)
+            next_time = DateTime.add(current_time, @const_reset_seconds)
             next_hits = state.hits - 1
 
-            {:reply, {:ok, %Reply{throttled: false, hits_left: next_hits, wait: next_grace}},
-             %State{state | grace: next_grace, multiplier: 1, hits: next_hits}}
+            {:reply, {:ok, %Reply{throttled: false, hits_left: next_hits, wait: next_time}},
+             %State{state | grace: next_time, multiplier: 1, hits: next_hits}}
         end
 
       true ->
