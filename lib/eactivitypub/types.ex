@@ -14,7 +14,7 @@
 # limitations under the License.
 defmodule Eactivitypub.Types do
   defmodule ID do
-    @doc """
+    @moduledoc """
     A hash of a User for ETS.
     """
     @enforce_keys [:created, :nonce]
@@ -25,7 +25,7 @@ defmodule Eactivitypub.Types do
             nonce: integer()
           }
 
-    @spec create :: Eactivitypub.User.ID.t()
+    @spec create :: t()
     def create() do
       nonce = :erlang.unique_integer()
       created = DateTime.utc_now()
@@ -70,6 +70,45 @@ defmodule Eactivitypub.Types do
         not Regex.match?(~r/^.*(\@).*$/, user!) ->
           %__MODULE__{username: user!, hostname: host}
       end
+    end
+
+    @spec decode(binary) ::
+            {:error, :invalid_host | :invalid_user} | {:ok, t()}
+    @doc """
+    Decodes a federated mention into an Eactivitypub one.
+
+    ## Examples
+
+        iex> Eactivitypub.Types.Mention.decode("chlorophytus@example.com")
+        {:ok, %Eactivitypub.Types.Mention{hostname: "example.com", username: "chlorophytus"}}
+
+    """
+    def decode(mention) do
+      case Regex.named_captures(~r/^((?<user>[[:graph:]]+)\@)(?<host>[^\/?#]*)$/u, mention) do
+        %{"user" => user!, "host" => host} ->
+          if not Regex.match?(~r/^.*(\@).*$/, user!) do
+            {:ok, %__MODULE__{username: user!, hostname: host}}
+          else
+            {:error, :invalid_user}
+          end
+
+        _ ->
+          {:error, :invalid_host}
+      end
+    end
+
+    @spec encode(t()) :: binary
+    @doc """
+    Encodes an Eactivitypub mention into a federated one. No sanitisation is performed.
+
+    ## Examples
+
+        iex> Eactivitypub.Types.Mention.encode(%Eactivitypub.Types.Mention{hostname: "example.com", username: "chlorophytus"})
+        "chlorophytus@example.com"
+
+    """
+    def encode(mention) do
+      "#{mention.username}@#{mention.hostname}"
     end
   end
 
