@@ -1,4 +1,4 @@
-# > Run tests on the Rate Limiter
+# > Run tests on the rate limiter
 # Copyright 2020 Roland Metivier
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,36 +12,56 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-alias Eactivitypub.RateLimiter, as: RateLimiter
+alias Eactivitypub.RateLimit, as: RateLimit
+alias Eactivitypub.GoatRateLimit, as: GoatRateLimit
 require Logger
 
-defmodule EactivitypubTestRatelimiter do
-  use ExUnit.Case, async: true
-  doctest Eactivitypub.RateLimiter
+defmodule EactivitypubTestRatelimit do
+  use ExUnit.Case
+  doctest Eactivitypub.RateLimit
 
   setup do
-    rate_limiter = start_supervised!(RateLimiter)
-    %{rate_limiter: rate_limiter}
+    rate_limit =
+      start_supervised!({
+        GoatRateLimit,
+        # Do note that we initialize constants now.
+        %{
+          iconsts: %RateLimit.IConsts{
+            initial_left: 2,
+            reset_seconds: 2,
+            grace_seconds: 60,
+            grace_max: 256,
+            grace_gc: 60 * 60 * 60 * 72
+          },
+          data: nil
+        }
+      })
+
+    %{rate_limit: rate_limit}
   end
 
-  test "rate limits properly", %{rate_limiter: rate_limiter} do
-    {:ok, ref} = RateLimiter.get_reference(rate_limiter)
+  # Test for a rate limiter hit.
+  test "rate limits properly", %{rate_limit: rate_limit} do
+    {:ok, ref} = RateLimit.get_reference(rate_limit)
     Logger.debug("testing with mock #{ref}")
-    RateLimiter.try_decrement(rate_limiter, ref)
-    RateLimiter.try_decrement(rate_limiter, ref)
-    RateLimiter.try_decrement(rate_limiter, ref)
-    {:ok, response} = RateLimiter.try_decrement(rate_limiter, ref)
+    RateLimit.try_decrement(rate_limit, ref, :dont_care)
+    RateLimit.try_decrement(rate_limit, ref, :dont_care)
+    RateLimit.try_decrement(rate_limit, ref, :dont_care)
+    {:ok, response} = RateLimit.try_decrement(rate_limit, ref, :dont_care)
     assert response.throttled
   end
 
-  test "rate limits faithfully", %{rate_limiter: rate_limiter} do
-    {:ok, ref} = RateLimiter.get_reference(rate_limiter)
+  # Test if a rate limiter releases its hit.
+  test "rate limits faithfully", %{rate_limit: rate_limit} do
+    {:ok, ref} = RateLimit.get_reference(rate_limit)
     Logger.debug("testing with mock #{ref}")
-    {:ok, response} = RateLimiter.try_decrement(rate_limiter, ref)
+    {:ok, response} = RateLimit.try_decrement(rate_limit, ref, :dont_care)
     assert !response.throttled
 
     :timer.sleep(3000)
-    {:ok, response} = RateLimiter.try_decrement(rate_limiter, ref)
+    {:ok, response} = RateLimit.try_decrement(rate_limit, ref, :dont_care)
     assert !response.throttled
   end
+
+  # TODO: Test garbage collection
 end
