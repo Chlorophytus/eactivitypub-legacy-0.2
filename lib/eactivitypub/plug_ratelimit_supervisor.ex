@@ -1,4 +1,4 @@
-# > Rate limiter test
+# > Supervisor for rate limits
 # Copyright 2020 Roland Metivier
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,27 +14,24 @@
 # limitations under the License.
 require Logger
 
-defmodule Eactivitypub.GoatRateLimit do
-  use Eactivitypub.RateLimit
+defmodule Eactivitypub.Plug.RateLimit.Supervisor do
+  @moduledoc """
+  Rate limiter OTP supervisor. Sacrificial in that it'll terminate all of its
+  children in the event that one child dies. This is justified. Just let it
+  crash.
+  """
+  use Supervisor
 
-  @impl true
-  def init_data(data) do
-    Logger.info("Initialised: #{data}")
-    data
+  def start_link(scope, module) do
+    Supervisor.start_link(__MODULE__, [scope, module], name: __MODULE__)
   end
 
   @impl true
-  def handle_throttle(data, _payload) do
-    {:ok, data}
-  end
+  def init([scope, module]) do
+    children = [
+      {Eactivitypub.Plug.RateLimit.Server, [{self(), scope, module}]}
+    ]
 
-  @impl true
-  def handle_request(data, _payload) do
-    {:ok, data}
-  end
-
-  @impl true
-  def handle_gc(_data) do
-    :ok
+    Supervisor.init(children, strategy: :one_for_all)
   end
 end

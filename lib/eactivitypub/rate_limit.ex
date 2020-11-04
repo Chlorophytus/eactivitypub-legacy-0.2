@@ -32,6 +32,10 @@ defmodule Eactivitypub.RateLimit do
   def handle_request(data, _payload), do: {:ok, data}
   defoverridable handle_request: 2
 
+  @callback handle_gc(any) :: :ok
+  def handle_gc(_data), do: :ok
+  defoverridable handle_gc: 1
+
   defmodule Reply do
     @moduledoc """
     The rate limiter server responds with this struct when it gets triggered.
@@ -138,6 +142,8 @@ defmodule Eactivitypub.RateLimit do
         case DateTime.compare(DateTime.utc_now(), gc_time) do
           :gt ->
             # This state should be garbage collected now
+            __MODULE__.handle_gc(state.data)
+
             {:stop, :normal, state}
 
           _ ->

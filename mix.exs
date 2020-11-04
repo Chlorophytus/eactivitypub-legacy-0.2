@@ -23,7 +23,7 @@ defmodule Eactivitypub.MixProject do
   defp deps do
     [
       {:plug_cowboy, "~> 2.3"},
-      {:poison, "~> 3.1"},
+      {:jason, "~> 1.2"},
       {:gen_stage, "~> 1.0"},
       {:ex_doc, "~> 0.22", only: :dev, runtime: false}
       # {:dep_from_hexpm, "~> 0.3.0"},

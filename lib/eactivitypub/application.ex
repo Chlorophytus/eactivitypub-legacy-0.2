@@ -26,7 +26,12 @@ defmodule Eactivitypub do
     children = [
       # Starts a worker by calling: Eactivitypub.Worker.start_link(arg)
       # {Eactivitypub.Worker, arg}
-      {Plug.Cowboy, scheme: :http, plug: Eactivitypub.PlugServer, options: [port: 8080]}
+      {Plug.Cowboy, scheme: :http, plug: Eactivitypub.Plug, options: [port: 8080]},
+      {EactivityPub.Plug.RateLimit.Supervisor,
+       [
+         :root,
+         Eactivitypub.Plug.RateLimit.Server
+       ]}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

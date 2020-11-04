@@ -1,4 +1,4 @@
-# > A Plug Cowboy server for handling connections
+# > Rate limiter for plug
 # Copyright 2020 Roland Metivier
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,21 +12,30 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-defmodule Eactivitypub.PlugServer do
-  use Plug.Router
+require Logger
 
-  plug Plug.Logger
-  plug :match
-  plug :dispatch
+defmodule Eactivitypub.Plug.RateLimit do
+  use Eactivitypub.RateLimit
 
-  # https://docs.joinmastodon.org/client/intro/
-  # https://docs.joinmastodon.org/spec/webfinger/
-
-  get "/" do
-    conn |> put_resp_content_type("text/plain") |> send_resp(200, "Hello World")
+  @impl true
+  def init_data(data) do
+    Logger.info("Initialised: #{data}")
+    data
   end
 
-  match _ do
-    conn |> put_resp_content_type("text/plain") |> send_resp(501, "Not Implemented")
+  @impl true
+  def handle_throttle(data, %{:caller => caller}) do
+    {:ok, data}
+  end
+
+  @impl true
+  def handle_request(data, %{:caller => caller}) do
+    send caller, {:error, :rate_limited}
+    {:ok, data}
+  end
+
+  @impl true
+  def handle_gc(_data) do
+    :ok
   end
 end
