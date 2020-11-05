@@ -1,4 +1,4 @@
-# > Supervisor for rate limits
+# > Handles a timeline
 # Copyright 2020 Roland Metivier
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,25 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 require Logger
+alias Eactivitypub.Stages.Timeline, as: Timeline
 
-defmodule Eactivitypub.Plug.RateLimit.Supervisor do
-  @moduledoc """
-  Rate limiter OTP supervisor. Sacrificial in that it'll terminate all of its
-  children in the event that one child dies. This is justified. Just let it
-  crash.
-  """
-  use Supervisor
-
-  def start_link(scope, module) do
-    Supervisor.start_link(__MODULE__, [scope, module], name: __MODULE__)
+defmodule Eactivitypub.Stages.Client do
+  def start_link(opts) do
+    Task.start_link(__MODULE__, :init, opts)
   end
-
-  @impl true
-  def init([scope, module]) do
-    children = [
-      {Eactivitypub.Plug.RateLimit.Server, [{self(), scope, module}]}
-    ]
-
-    Supervisor.init(children, strategy: :one_for_all)
+  def init() do
+    Timeline.post("Hello world! #{DateTime.utc_now()}")
+    Stream.timer(10000)
+    Timeline.post("Byebye world! #{DateTime.utc_now()}")
   end
 end

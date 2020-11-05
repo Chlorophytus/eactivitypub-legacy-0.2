@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-alias Eactivitypub.Plug.RateLimit, as: EactivityPubRateLimit
+alias Eactivitypub.Stages.Timeline, as: Timeline
 
 defmodule Eactivitypub.Plug do
   use Plug.Router
@@ -25,17 +25,18 @@ defmodule Eactivitypub.Plug do
   # https://docs.joinmastodon.org/spec/webfinger/
 
   get "/" do
-    {:ok, client_pid} =
-      EactivityPubRateLimit.Server.get_client(
-        EactivityPubRateLimit.Server,
-        %EactivityPubRateLimit.Server.Subscope{ip_addr: conn.remote_ip, resource: :hello}
-      )
-
-    conn |> put_resp_content_type("application/json") |> send_resp(200, json)
+    {:ok, resp} = Timeline.get()
+    {:ok, json} = Jason.encode(resp)
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, json)
   end
 
   match _ do
-    {:ok, json} = Jason.encode(%{:e => 501})
-    conn |> put_resp_content_type("application/json") |> send_resp(501, json)
+    {:ok, resp} = Timeline.get()
+    {:ok, json} = Jason.encode(resp)
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, json)
   end
 end

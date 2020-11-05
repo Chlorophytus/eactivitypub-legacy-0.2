@@ -26,12 +26,7 @@ defmodule Eactivitypub do
     children = [
       # Starts a worker by calling: Eactivitypub.Worker.start_link(arg)
       # {Eactivitypub.Worker, arg}
-      {Plug.Cowboy, scheme: :http, plug: Eactivitypub.Plug, options: [port: 8080]},
-      {EactivityPub.Plug.RateLimit.Supervisor,
-       [
-         :root,
-         Eactivitypub.Plug.RateLimit.Server
-       ]}
+      {Plug.Cowboy, scheme: :http, plug: Eactivitypub.Plug, options: [port: 8080]}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
@@ -39,6 +34,8 @@ defmodule Eactivitypub do
     opts = [strategy: :one_for_one, name: Eactivitypub.Supervisor]
     Logger.info("=== start eactivitypub application ===")
     Application.ensure_all_started(:crypto)
+    Eactivitypub.Stages.Server.start_link([])
+    Eactivitypub.Stages.Timeline.start_link([])
     Supervisor.start_link(children, opts)
   end
 end
