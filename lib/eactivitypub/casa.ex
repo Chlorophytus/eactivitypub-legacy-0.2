@@ -1,4 +1,4 @@
-# > Handles a timeline
+# > Interface with Scylla with Rust NIFs
 # Copyright 2020 Roland Metivier
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,16 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-require Logger
-alias Eactivitypub.Stages.Timeline, as: Timeline
+defmodule Eactivitypub.Casa do
+  use Rustler, otp_app: :eactivitypub, crate: :casa
 
-defmodule Eactivitypub.Stages.Client do
-  def start_link(opts) do
-    Task.start_link(__MODULE__, :init, opts)
+  defmodule ScyllaInstance do
+    # UNIMPLEMENTED!
   end
-  def init() do
-    Timeline.post("Hello world! #{DateTime.utc_now()}")
-    Stream.timer(10000)
-    Timeline.post("Byebye world! #{DateTime.utc_now()}")
+
+  defmodule User do
+    @enforce_keys [:name, :unix_created]
+    defstruct name: "ERROR", unix_created: 0
+    @type t :: %__MODULE__{name: binary, unix_created: non_neg_integer}
   end
+
+  def user_put(_arg1), do: :erlang.nif_error(:nif_not_loaded)
 end

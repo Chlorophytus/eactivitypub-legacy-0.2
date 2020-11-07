@@ -1,21 +1,14 @@
 # eactivitypub
-
 Elixir-powered ActivityPub / Mastodon
 
-## Installation
-
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `eactivitypub` to your list of dependencies in `mix.exs`:
-
+## Testbench examples
+Doing this...
 ```elixir
-def deps do
-  [
-    {:eactivitypub, "~> 0.2.0"}
-  ]
-end
+iex> Enum.map(1..20, fn post -> Eactivitypub.Timeline.post(Eactivitypub.Timeline, post) end)
+[:ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok,
+ :ok, :ok, :ok, :ok]
 ```
-
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/eactivitypub](https://hexdocs.pm/eactivitypub).
-
+...then using the JSON API would result in...
+```json
+{"object":[20,19,18,17,16],"status":0}
+```

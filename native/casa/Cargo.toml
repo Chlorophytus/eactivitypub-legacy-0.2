@@ -1,0 +1,15 @@
+[package]
+name = "casa"
+version = "0.1.0"
+authors = []
+edition = "2018"
+
+[lib]
+name = "casa"
+path = "src/lib.rs"
+crate-type = ["dylib"]
+
+[dependencies]
+cdrs = "2"
+lazy_static = "1.0"
+rustler = "0.22.0-rc.0"

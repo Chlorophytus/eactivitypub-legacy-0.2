@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-alias Eactivitypub.Stages.Timeline, as: Timeline
+alias Eactivitypub.Timeline, as: Timeline
 
 defmodule Eactivitypub.Plug do
   use Plug.Router
@@ -25,18 +25,13 @@ defmodule Eactivitypub.Plug do
   # https://docs.joinmastodon.org/spec/webfinger/
 
   get "/" do
-    {:ok, resp} = Timeline.get()
-    {:ok, json} = Jason.encode(resp)
-    conn
-    |> put_resp_content_type("application/json")
-    |> send_resp(200, json)
+    {:ok, content} = Timeline.get(Timeline, 5)
+    {:ok, json} = Jason.encode(%{"status" => 0, "object" => content})
+    conn |> put_resp_content_type("application/json") |> send_resp(200, json)
   end
 
   match _ do
-    {:ok, resp} = Timeline.get()
-    {:ok, json} = Jason.encode(resp)
-    conn
-    |> put_resp_content_type("application/json")
-    |> send_resp(200, json)
+    {:ok, json} = Jason.encode(%{"status" => -2, "object" => nil})
+    conn |> put_resp_content_type("application/json") |> send_resp(404, json)
   end
 end
