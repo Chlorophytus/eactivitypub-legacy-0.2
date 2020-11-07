@@ -15,15 +15,13 @@
 defmodule Eactivitypub.Casa do
   use Rustler, otp_app: :eactivitypub, crate: :casa
 
-  defmodule ScyllaInstance do
-    # UNIMPLEMENTED!
-  end
-
   defmodule User do
     @enforce_keys [:name, :unix_created]
     defstruct name: "ERROR", unix_created: 0
     @type t :: %__MODULE__{name: binary, unix_created: non_neg_integer}
+
   end
 
+  @spec user_put(User.t()) :: :ok
   def user_put(_arg1), do: :erlang.nif_error(:nif_not_loaded)
 end

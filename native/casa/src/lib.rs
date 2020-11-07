@@ -12,7 +12,18 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use rustler::{Atom, NifResult, NifStruct};
+extern crate cdrs;
+use cdrs::{
+    authenticators::NoneAuthenticator,
+    cluster::{
+        session::{new as new_session, Session},
+        ClusterTcpConfig, NodeTcpConfigBuilder, TcpConnectionPool,
+    },
+    load_balancing::SingleNode,
+};
+use rustler::{Atom, Env, NifResult, NifStruct, ResourceArc};
+use std::sync::RwLock;
+use lazy_static::{lazy_static};
 
 mod atoms {
     rustler::atoms! {
@@ -20,7 +31,23 @@ mod atoms {
     }
 }
 
-// === USER ===================================================================
+// === Database ===============================================================
+pub struct DatabaseResource {
+    session: RwLock<Session<SingleNode<TcpConnectionPool<NoneAuthenticator>>>>,
+}
+
+#[rustler::nif]
+pub fn connect(host: String) -> ResourceArc<DatabaseResource> {
+    let node = NodeTcpConfigBuilder::new(&host, NoneAuthenticator).build();
+    let cluster = ClusterTcpConfig(vec![node]);
+    ResourceArc::new(DatabaseResource {
+        session: RwLock::new(new_session(&cluster, SingleNode::new()).expect("Failed to connect")),
+    })
+}
+
+pub fn 
+
+// === User ===================================================================
 #[derive(Debug, NifStruct)]
 #[module = "Eactivitypub.Casa.User"]
 pub struct User {
@@ -29,10 +56,15 @@ pub struct User {
 }
 
 #[rustler::nif]
-fn user_put(a: User) -> NifResult<Atom> {
+pub fn user_put(a: User) -> NifResult<Atom> {
     println!("Test: {:?}\r", a);
     Ok(atoms::ok())
 }
 
 // === NIFs INIT ==============================================================
 rustler::init!("Elixir.Eactivitypub.Casa", [user_put]);
+
+pub fn on_load(env: Env) -> bool {
+    rustler::resource!(DatabaseResource, env);
+    true
+}
