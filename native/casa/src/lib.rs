@@ -12,18 +12,23 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#[macro_use]
+extern crate cdrs_helpers_derive;
 extern crate cdrs;
-use cdrs::{
-    authenticators::NoneAuthenticator,
-    cluster::{
-        session::{new as new_session, Session},
-        ClusterTcpConfig, NodeTcpConfigBuilder, TcpConnectionPool,
-    },
-    load_balancing::SingleNode,
-    query::*,
-    Result as CDRSResult,
-};
-use rustler::{Atom, Env, Error, NifResult, NifStruct, ResourceArc};
+extern crate rustler;
+
+use cdrs::authenticators::NoneAuthenticator;
+use cdrs::cluster::session::{new as new_session, Session};
+use cdrs::cluster::{ClusterTcpConfig, NodeTcpConfigBuilder, TcpConnectionPool};
+use cdrs::load_balancing::SingleNode;
+use cdrs::query::*;
+
+mod casa;
+// use cdrs::frame::IntoBytes;
+// use cdrs::types::from_cdrs::FromCDRSByName;
+// use cdrs::types::prelude::*;
+
+use rustler::{Atom, Env, NifResult, NifStruct, ResourceArc};
 
 mod atoms {
     rustler::atoms! {
@@ -48,18 +53,6 @@ pub fn connect(host: String) -> ResourceArc<DatabaseResource> {
 }
 
 // === Timelines ==============================================================
-static PUT_TIMELINE_QUERY: &'static str = r#"
-INSERT INTO eactivitypub.timeline (
-    recver_idx,
-    sender_idx,
-    post_time,
-    post_idx,
-    post_root,
-    post_reps,
-    content)
-VALUES (?, ?, ?, ?, ?, ?, ?);
-"#;
-
 #[derive(Debug, NifStruct)]
 #[module = "Eactivitypub.Casa.Timeline"]
 pub struct Timeline {
@@ -74,10 +67,16 @@ pub struct Timeline {
 
 #[rustler::nif]
 pub fn timeline_put(data: ResourceArc<DatabaseResource>, a: Timeline) -> NifResult<Atom> {
-    match data.session.query(PUT_TIMELINE_QUERY) {
-        Ok(_) => Ok(atoms::ok()),
-        Err(_) => Err(Error::RaiseAtom("cdrs")),
-    }
+    let obj = casa::Row {
+        recver_idx: a.recver_idx,
+        sender_idx: a.sender_idx,
+        post_time: a.post_time,
+        post_root: a.post_root,
+        post_idx: a.post_idx,
+        post_reps: a.post_reps,
+        content: a.content,
+    };
+    Ok(atoms::ok())
 }
 
 // === NIFs INIT ==============================================================
@@ -86,4 +85,19 @@ rustler::init!("Elixir.Eactivitypub.Casa", [timeline_put]);
 pub fn on_load(env: Env) -> bool {
     rustler::resource!(DatabaseResource, env);
     true
+}
+
+
+impl casa::Row {
+    pub fn into_query_values(self) -> QueryValues {
+        cdrs::query_values!(
+            "recver_idx" => self.recver_idx,
+            "sender_idx" => self.sender_idx,
+            "post_time" => self.post_time,
+            "post_root" =>  self.post_root,
+            "post_idx" => self.post_idx,
+            "post_reps" => self.post_reps,
+            "content" => self.content,
+        )
+    }
 }
