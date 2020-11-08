@@ -20,20 +20,22 @@ use cdrs::{
         ClusterTcpConfig, NodeTcpConfigBuilder, TcpConnectionPool,
     },
     load_balancing::SingleNode,
+    query::*,
+    Result as CDRSResult,
 };
-use rustler::{Atom, Env, NifResult, NifStruct, ResourceArc};
-use std::sync::RwLock;
-use lazy_static::{lazy_static};
+use rustler::{Atom, Env, Error, NifResult, NifStruct, ResourceArc};
 
 mod atoms {
     rustler::atoms! {
-        ok
+        ok,
+        error,
+        invalid,
     }
 }
 
 // === Database ===============================================================
 pub struct DatabaseResource {
-    session: RwLock<Session<SingleNode<TcpConnectionPool<NoneAuthenticator>>>>,
+    session: Session<SingleNode<TcpConnectionPool<NoneAuthenticator>>>,
 }
 
 #[rustler::nif]
@@ -41,28 +43,45 @@ pub fn connect(host: String) -> ResourceArc<DatabaseResource> {
     let node = NodeTcpConfigBuilder::new(&host, NoneAuthenticator).build();
     let cluster = ClusterTcpConfig(vec![node]);
     ResourceArc::new(DatabaseResource {
-        session: RwLock::new(new_session(&cluster, SingleNode::new()).expect("Failed to connect")),
+        session: new_session(&cluster, SingleNode::new()).expect("Failed to connect"),
     })
 }
 
-pub fn 
+// === Timelines ==============================================================
+static PUT_TIMELINE_QUERY: &'static str = r#"
+INSERT INTO eactivitypub.timeline (
+    recver_idx,
+    sender_idx,
+    post_time,
+    post_idx,
+    post_root,
+    post_reps,
+    content)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+"#;
 
-// === User ===================================================================
 #[derive(Debug, NifStruct)]
-#[module = "Eactivitypub.Casa.User"]
-pub struct User {
-    name: String,
-    unix_created: u64,
+#[module = "Eactivitypub.Casa.Timeline"]
+pub struct Timeline {
+    recver_idx: i64,
+    sender_idx: i64,
+    post_time: i64,
+    post_root: i64,
+    post_idx: i64,
+    post_reps: Vec<i64>,
+    content: String,
 }
 
 #[rustler::nif]
-pub fn user_put(a: User) -> NifResult<Atom> {
-    println!("Test: {:?}\r", a);
-    Ok(atoms::ok())
+pub fn timeline_put(data: ResourceArc<DatabaseResource>, a: Timeline) -> NifResult<Atom> {
+    match data.session.query(PUT_TIMELINE_QUERY) {
+        Ok(_) => Ok(atoms::ok()),
+        Err(_) => Err(Error::RaiseAtom("cdrs")),
+    }
 }
 
 // === NIFs INIT ==============================================================
-rustler::init!("Elixir.Eactivitypub.Casa", [user_put]);
+rustler::init!("Elixir.Eactivitypub.Casa", [timeline_put]);
 
 pub fn on_load(env: Env) -> bool {
     rustler::resource!(DatabaseResource, env);
